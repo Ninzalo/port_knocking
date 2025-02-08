@@ -1,6 +1,12 @@
 # Description:
 These scripts allow you to setup port knocking on your new server and connect to it with ease.
 
+> [!WARNING]
+> Run on your own risk. All of iptables configurations will be deleted if you run this script.
+
+> [!NOTE]
+> Works only with passwordless ssh key
+
 # Usage:
 ## Step 1: Connect to your server via ssh and save a fingerprint
 
@@ -48,8 +54,6 @@ Then you will be prompted to enter your desired user's password.
 
 Wait till the script finishes.
 
-Done!
-
 ## Step 3: Connect to the server with your desired port
 ```sh
 sh ./connect_with_knock.sh <target_username> <target_ip> <target_port> <port_open_seq>
@@ -59,5 +63,3 @@ Example:
 ```sh
 sh ./connect_with_knock.sh username 111.11.11.111 2222 7000,8000,9000
 ```
-
-Done!
