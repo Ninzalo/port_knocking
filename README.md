@@ -3,6 +3,22 @@ These scripts allow you to setup port knocking on your new server and connect to
 
 # Usage:
 ## Step 1: Connect to your server via ssh and save a fingerprint
+
+<details>
+<summary>Setup ssh key (skip if you have one)</summary>
+<h4> Generate a key on your local machine</h4>
+
+```sh
+ssh-keygen -t ed25519
+```
+<h4>Copy public key to your server</h4>
+
+```sh
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<your_server_ip>
+```
+</details>
+
+### Connect to your server via ssh
 ```sh
 ssh root@<your_server_ip>
 ```
