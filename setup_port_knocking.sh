@@ -8,7 +8,7 @@ if [ $# -ne 4 ]; then
 fi
 
 # Запрос пароля с безопасным вводом
-read -sp "Enter user password: " username_password
+read -sp "Enter password for your new user (not root): " username_password
 echo  # Переход на новую строку после ввода пароля
 
 # Параметры
@@ -51,6 +51,57 @@ check_remote_command() {
     ssh -q -o BatchMode=yes -o ConnectTimeout=5 root@$target_ip exit
 }
 
+check_if_port_open() {
+    echo "Checking port status..."
+    if ! nc -z -w5 "$target_ip" "$target_port"; then
+        echo "Error: Port $target_port not opened after knocking" >&2
+        exit 1
+    fi
+}
+
+check_if_port_closed() {
+    echo "Verifying port closure..."
+
+    # Добавляем задержку для применения правил iptables
+    sleep 2
+
+    # Проверяем порт с помощью netcat и nmap
+    local max_retries=3
+    local success=0
+
+    for ((i=1; i<=max_retries; i++)); do
+        # Проверка через netcat
+        if ! nc -z -w 3 "$target_ip" "$target_port"; then
+            success=1
+            break
+        fi
+        
+        # Дополнительная проверка через nmap с определением состояния
+        nmap_result=$(nmap -Pn -p "$target_port" "$target_ip" | grep "$target_port/tcp")
+        if [[ ! $nmap_result =~ "closed" && ! $nmap_result =~ "filtered" ]]; then
+            echo "Warning: Port $target_port appears open (attempt $i)"
+            sleep 1
+        else
+            success=1
+            break
+        fi
+    done
+
+    if (( success == 0 )); then
+        echo "Error: Port $target_port remains open after closing sequence" >&2
+        exit 1
+    fi
+
+    # Проверка через SSH
+    ssh_timeout=5
+    if ssh -p "$target_port" -o ConnectTimeout=$ssh_timeout -q "$target_username@$target_ip" exit; then
+        echo "Error: SSH connection still active after port closure" >&2
+        exit 1
+    fi
+
+    echo "Port $target_port successfully closed"
+}
+
 # Валидация IP
 if ! validate_ip "$target_ip"; then
     echo "Error: Invalid IP address format" >&2
@@ -76,7 +127,7 @@ for port in "${open_ports[@]}"; do
 done
 
 # Проверка зависимостей
-for cmd in sshpass ssh scp nmap; do
+for cmd in sshpass ssh scp nmap nc; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "Error: Required command '$cmd' not found" >&2
         exit 1
@@ -121,12 +172,26 @@ function remote_change_value() {
     }
 }
 
+knock_ports() {
+    local sequence=$1
+    echo "Knocking sequence: $sequence"
+    IFS=',' read -ra ports <<< "$sequence"
+    for port in "${ports[@]}"; do
+        nmap -Pn --host-timeout 100 --max-retries 0 -p "$port" "$target_ip" > /dev/null 2>&1
+        sleep 0.5
+    done
+}
+
 echo "=== Starting Port Knocking Setup ==="
 
 # 1. Создание пользователя и базовая настройка SSH
 {
 echo "Step 1/10: Creating user and SSH setup..."
 ssh -T root@$target_ip <<EOF
+apt-get update
+apt-get upgrade -y
+apt-get -y install sudo
+
 # Удаление предыдущего пользователя если существует
 if getent passwd "$target_username" >/dev/null; then
     userdel -rf "$target_username" || rm -rf "/home/$target_username"
@@ -264,36 +329,24 @@ EOF
 # 9. Проверка
 {
 echo "Step 9/10: Testing..."
-echo "Knocking ports: $port_open_seq"
-for port in ${port_open_seq//,/ }; do
-    nmap -Pn --max-retries 0 -p $port $target_ip
-    sleep 0.5
-done
+
+# Проверка закрытия порта
+check_if_port_closed
+
+knock_ports "$port_open_seq"
 
 # Проверка открытия порта
-echo "Checking port status..."
-if ! nc -z -w5 "$target_ip" "$target_port"; then
-    echo "Error: Port $target_port not opened after knocking" >&2
-    exit 1
-fi
+check_if_port_open
 
 # Подключение
 echo "Connecting..."
 ssh -o ConnectTimeout=10 -p "$target_port" "$target_username@$target_ip" "echo 'Connection successful!'"
 
 # Закрытие порта
-echo "Closing ports: $port_close_seq"
-for port in ${port_close_seq//,/ }; do
-    nmap -Pn --max-retries 0 -p $port $target_ip
-    sleep 0.5
-done
+knock_ports "$port_close_seq"
 
 # Проверка закрытия порта
-echo "Verifying port closure..."
-if nc -z -w5 "$target_ip" "$target_port"; then
-    echo "Error: Port $target_port still open after closing sequence" >&2
-    exit 1
-fi
+check_if_port_closed
 } || exit 1
 
 # Завершение работы
