@@ -30,7 +30,7 @@ knock_ports() {
     IFS=',' read -ra ports <<< "$sequence"
     for port in "${ports[@]}"; do
         nmap -Pn --host-timeout 100 --max-retries 0 -p "$port" "$target_ip" > /dev/null 2>&1
-        sleep 0.3
+        sleep 0.5
     done
 }
 
