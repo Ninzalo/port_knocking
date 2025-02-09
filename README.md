@@ -28,10 +28,14 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub root@<your_server_ip>
 ```sh
 ssh root@<your_server_ip>
 ```
-Example:
+
+<details>
+<summary>Example</summary>
+
 ```sh
 ssh root@111.11.111.111
 ```
+</details>
 
 ## Step 2: Run the setup script
 ```sh
@@ -45,10 +49,13 @@ sh ./setup_port_knocking.sh <target_ip> <target_port> <target_username> <port_op
     <li><code>port_open_seq</code>: sequence of ports to open <code>target_port</code></li>
 </ul>
 
-Example:
+<details>
+<summary>Example</summary>
+
 ```sh
 sh ./setup_port_knocking.sh 111.11.11.111 2222 username 7000,8000,9000
 ```
+</details>
 
 Then you will be prompted to enter your desired user's password.
 
@@ -59,7 +66,10 @@ Wait till the script finishes.
 sh ./connect_with_knock.sh <target_username> <target_ip> <target_port> <port_open_seq>
 ```
 
-Example:
+<details>
+<summary>Example</summary>
+
 ```sh
 sh ./connect_with_knock.sh username 111.11.11.111 2222 7000,8000,9000
 ```
+</details>
